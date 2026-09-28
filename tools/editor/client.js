@@ -108,6 +108,8 @@
     document.querySelectorAll('.ed-marked').forEach(function (n) { n.classList.remove('ed-marked'); });
     hideBadge();
     closePop();
+    // 点「完成编辑」通常就意味着「我改完了」，顺手把改动发布到线上
+    publishNow();
   }
 
   function markAll() {
@@ -343,15 +345,44 @@
     node.style.top = Math.round(top + window.scrollY) + 'px';
   }
 
+  /* ------------------------------------------------------- 发布到线上 */
+  var publishBusy = false;
+
+  function setPublishState(text, kind) {
+    var el = document.querySelector('[data-ed-pubstate]');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'ed-pubstate' + (kind ? ' ed-pubstate--' + kind : '');
+  }
+
+  function publishNow() {
+    if (publishBusy) return;
+    publishBusy = true;
+    setPublishState('正在发布…');
+    post('publish', {}, function (err, res) {
+      publishBusy = false;
+      if (err) {
+        setPublishState('发布失败', 'error');
+        toast('发布失败：' + err.message + '（改动已存在本地，未丢失）', 'error');
+        return;
+      }
+      if (!res.changed) { setPublishState('线上已是最新'); toast(res.message); return; }
+      setPublishState('已发布 ' + (res.commit || ''), 'ok');
+      toast(res.message);
+    });
+  }
+
   /* ------------------------------------------------------------ 工具栏 */
   function buildToolbar() {
     var bar = document.createElement('div');
     bar.className = 'ed-toolbar';
     bar.setAttribute('data-editor-ui', '');
     bar.innerHTML =
+      '<span class="ed-pubstate" data-ed-pubstate></span>' +
       '<div class="ed-toolbar__hint">本地编辑器</div>' +
       '<button type="button" class="ed-btn ed-btn--primary" data-ed-toggle>开始编辑</button>' +
-      '<button type="button" class="ed-btn ed-btn--ghost" data-ed-undo>撤销上一步</button>';
+      '<button type="button" class="ed-btn ed-btn--ghost" data-ed-undo>撤销上一步</button>' +
+      '<button type="button" class="ed-btn ed-btn--ghost" data-ed-publish>发布上线</button>';
     document.body.appendChild(bar);
 
     bar.querySelector('[data-ed-toggle]').addEventListener('click', function () {
@@ -365,6 +396,11 @@
         toast('已撤销，正在刷新…');
         setTimeout(function () { location.reload(); }, 700);
       });
+    });
+
+    bar.querySelector('[data-ed-publish]').addEventListener('click', function () {
+      if (publishBusy) { toast('正在发布，请稍候…'); return; }
+      publishNow();
     });
   }
 

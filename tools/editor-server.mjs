@@ -29,6 +29,7 @@ import {
 import { basename, dirname, resolve, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { publish } from './deploy.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const argPort = process.argv.find((a) => a.startsWith('--port='))?.split('=')[1];
@@ -48,6 +49,46 @@ const MIME = {
   '.pdf': 'application/pdf', '.ico': 'image/x-icon', '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8', '.md': 'text/markdown; charset=utf-8',
 };
+
+/* ------------------------------------------------- 自动发布到线上 */
+// 你每改一次内容，这里就记一笔「有未发布的改动」，然后在停止操作一段时间后
+// 自动把改动推到 GitHub，GitHub Pages 会自己重新构建。
+// 之所以要等一会儿：连着改十处文字没必要发布十次。
+const AUTO_PUBLISH_DELAY = Number(process.env.AUTO_PUBLISH_DELAY || 20000);
+
+let dirty = false;            // 有改动还没发布
+let publishing = false;       // 正在发布
+let publishTimer = null;      // 空闲计时器
+let lastResult = null;        // 上次发布的结果
+
+function schedulePublish(reason) {
+  dirty = true;
+  if (publishTimer) clearTimeout(publishTimer);
+  publishTimer = setTimeout(() => { publishTimer = null; runPublish(reason); }, AUTO_PUBLISH_DELAY);
+}
+
+async function runPublish(reason) {
+  if (publishing) return lastResult;      // 已经在发了，等它
+  if (!dirty) return { ok: true, changed: false, message: '没有需要发布的改动' };
+  publishing = true;
+  const t0 = Date.now();
+  console.log(`\n  ↑ 正在发布（${reason}）…`);
+  try {
+    const r = await publish({ onProgress: (m) => console.log('    ' + m) });
+    lastResult = { ...r, at: new Date().toISOString(), ms: Date.now() - t0 };
+    dirty = false;
+    console.log(`  ✓ ${r.message}`);
+    if (r.changed) console.log(`    ${r.url}`);
+    return lastResult;
+  } catch (e) {
+    lastResult = { ok: false, error: e.message, at: new Date().toISOString(), ms: Date.now() - t0 };
+    console.error(`  ✗ 发布失败：${e.message}`);
+    console.error('    改动已经存在本地文件里，没有丢；下次编辑会再试一次。');
+    return lastResult;                    // dirty 保持 true，下次还会再试
+  } finally {
+    publishing = false;
+  }
+}
 
 /* ------------------------------------------------------------ 小工具 */
 function safePath(relPath) {
@@ -397,16 +438,31 @@ const server = createServer(async (req, res) => {
     }
 
     if (path.startsWith('/__editor/')) {
-      if (path === '/__editor/status') { sendJson(res, 200, { ok: true, port: PORT }); return; }
+      if (path === '/__editor/status') {
+        sendJson(res, 200, { ok: true, port: PORT, dirty, publishing, lastPublish: lastResult });
+        return;
+      }
       if (req.method !== 'POST') { sendJson(res, 405, { ok: false, error: '只接受 POST' }); return; }
       const raw = await readBody(req);
       const body = raw ? JSON.parse(raw) : {};
+
+      // 「发布上线」按钮：立刻推一次，不用等空闲计时
+      if (path === '/__editor/publish') {
+        if (publishTimer) { clearTimeout(publishTimer); publishTimer = null; }
+        const r = await runPublish('手动');
+        sendJson(res, r.ok ? 200 : 500, r);
+        return;
+      }
+
       const result = path === '/__editor/text' ? saveText(body)
         : path === '/__editor/image' ? saveImage(body)
           : path === '/__editor/undo' ? undo(body)
             : null;
       if (!result) { sendJson(res, 404, { ok: false, error: '未知接口' }); return; }
-      sendJson(res, 200, { ok: true, ...result });
+
+      // 改动已经写进本地文件了，接下来安排一次自动发布
+      schedulePublish(path === '/__editor/undo' ? '撤销后' : '编辑后');
+      sendJson(res, 200, { ok: true, ...result, willPublishIn: AUTO_PUBLISH_DELAY });
       return;
     }
 
@@ -449,9 +505,30 @@ server.listen(PORT, HOST, () => {
   console.log('   · 点文字 → 直接改 → 点保存');
   console.log('   · 每次改动都会自动备份到 .editor-backup\\');
   console.log('');
-  console.log('   关闭这个窗口就停止编辑器（网站文件不受影响）');
+  console.log('   ★ 改完不用管，停手 ' + Math.round(AUTO_PUBLISH_DELAY / 1000) + ' 秒后会自动发布到线上');
+  console.log('     也可以点「发布上线」立刻发布，或点「完成编辑」触发一次发布');
+  console.log(`     ${`https://${'n3210636933-sketch'}.github.io/portfolio/`}`);
+  console.log('');
+  console.log('   关闭这个窗口就停止编辑器（这时若还有没发布的改动会先发布）');
   console.log('');
   if (process.argv.includes('--open')) {
     spawn('cmd', ['/c', 'start', '', url], { stdio: 'ignore', detached: true }).unref();
   }
 });
+
+/* ------------------------------------------------- 退出前把改动发出去 */
+// Ctrl+C 会走到这里。注意：直接点窗口右上角关闭，Windows 不会给 Node 机会，
+// 所以真正的保障是「停手若干秒自动发布」和「完成编辑时发布」，这里只是补一道。
+let closing = false;
+async function shutdown(signal) {
+  if (closing) return;
+  closing = true;
+  if (publishTimer) { clearTimeout(publishTimer); publishTimer = null; }
+  if (dirty) {
+    console.log(`\n  收到 ${signal}，先把没发布的改动发出去…`);
+    await runPublish('退出前');
+  }
+  process.exit(0);
+}
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGBREAK', () => shutdown('SIGBREAK'));

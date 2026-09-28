@@ -45,6 +45,18 @@
   margin-right: 2px;
   line-height: 30px;
 }
+.ed-pubstate {
+  padding: 0 4px 0 10px;
+  font-family: var(--ed-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ed-ink-2);
+  line-height: 30px;
+  white-space: nowrap;
+}
+.ed-pubstate:empty { display: none; }
+.ed-pubstate--ok { color: var(--ed-ok, #7fb8a1); }
+.ed-pubstate--error { color: var(--ed-err, #e8836a); }
 .ed-btn {
   appearance: none;
   border: 1px solid transparent;
