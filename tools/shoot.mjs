@@ -138,7 +138,12 @@ class CDP {
 
 // file:// 下不保证有可用的 localStorage，所以语言状态不去碰存储，
 // 而是加载完成后直接点页面上的语言切换按钮，走 site.js 的真实切换路径。
-const fileUrl = (relPath) => 'file:///' + encodeURI(join(root, relPath).replace(/\\/g, '/'));
+// 加 --base=<url> 可以改截线上站点，用来验收真实部署：
+//   node tools/shoot.mjs --all --base=https://user.github.io/repo
+const baseArg = argv.find((a) => a.startsWith('--base='));
+const baseUrl = baseArg ? baseArg.slice('--base='.length).replace(/\/+$/, '') : null;
+const fileUrl = (relPath) =>
+  baseUrl ? `${baseUrl}/${relPath}` : 'file:///' + encodeURI(join(root, relPath).replace(/\\/g, '/'));
 
 async function openSocket(url) {
   const ws = new WebSocket(url);
