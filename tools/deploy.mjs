@@ -51,21 +51,43 @@ function readToken() {
 }
 
 /* ------------------------------------------------------------ 请求 */
-async function api(method, path, body, token) {
-  const res = await fetch(`${API}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'niuluxiang-portfolio-publisher',
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
+// 这台机器到 GitHub 的连接偏不稳（github.com:443 的原始 TCP 直接超时，
+// api.github.com 偶尔也会抽一下），所以网络层失败自动重试，指数退避。
+async function api(method, path, body, token, attempt = 1) {
+  const MAX = 4;
+  let res;
+  try {
+    res = await fetch(`${API}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'niuluxiang-portfolio-publisher',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch (e) {
+    // 连不上 / 中途断流：可重试
+    if (attempt < MAX) {
+      await new Promise((r) => setTimeout(r, 800 * 2 ** (attempt - 1)));
+      return api(method, path, body, token, attempt + 1);
+    }
+    const err = new Error(`连不上 GitHub（${e.cause && e.cause.code ? e.cause.code : e.message}），已重试 ${MAX} 次`);
+    err.status = 0;
+    throw err;
+  }
+
   const text = await res.text();
   let json = null;
   try { json = text ? JSON.parse(text) : null; } catch { /* 非 JSON 响应 */ }
+
+  // 5xx / 429 是服务端临时状况，值得重试；4xx 是我们自己写错了，直接报出来
+  if (!res.ok && (res.status >= 500 || res.status === 429) && attempt < MAX) {
+    await new Promise((r) => setTimeout(r, 800 * 2 ** (attempt - 1)));
+    return api(method, path, body, token, attempt + 1);
+  }
   if (!res.ok) {
     const msg = (json && json.message) || text || `HTTP ${res.status}`;
     const err = new Error(msg);
