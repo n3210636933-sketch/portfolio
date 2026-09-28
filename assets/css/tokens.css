@@ -1,0 +1,128 @@
+/* ==========================================================================
+   tokens.css — 牛潞翔 · 视觉设计师作品集  设计令牌
+   墨青体系：冷调墨绿 + 朱砂红 + 青玉绿。不使用纯黑与中性灰。
+   底色整体提亮一档，避免长时间浏览的压抑感。
+   ========================================================================== */
+
+:root {
+  /* ---------- 背景 ---------- */
+  --c-bg:          #1E2A27;              /* 主背景 · 墨青 */
+  --c-bg-raised:   #26332F;              /* 次背景 · 卡片 / 区块 */
+  --c-bg-high:     #31403B;              /* 三级背景 · hover / 浮层 */
+  --c-bg-glass:    rgba(30, 42, 39, .78);
+  --c-bg-veil:     rgba(16, 23, 21, .60);
+
+  /* ---------- 文字 ---------- */
+  --c-text:        #F4F6F0;              /* 主文字 · 月白 */
+  --c-text-2:      #B0BAB3;              /* 次文字 · 青灰 */
+  --c-text-3:      #828D87;              /* 三级文字 · 弱化信息 */
+
+  /* ---------- 点缀 ---------- */
+  --c-accent:      #D25536;              /* 朱砂红 · 主点缀 */
+  --c-accent-2:    #E8836A;              /* 朱砂红 · 亮阶（hover / 描边） */
+  --c-accent-dim:  #A03E27;              /* 朱砂红 · 暗阶 */
+  --c-jade:        #7FB8A1;              /* 青玉绿 · 次点缀 */
+
+  /* ---------- 半透明点缀 ---------- */
+  --c-accent-soft: rgba(210, 85, 54, .15);
+  --c-accent-line: rgba(210, 85, 54, .42);
+  --c-jade-soft:   rgba(127, 184, 161, .14);
+  --c-jade-line:   rgba(127, 184, 161, .36);
+
+  /* ---------- 线条 ---------- */
+  --c-line:        rgba(244, 246, 240, .12);
+  --c-line-strong: rgba(244, 246, 240, .22);
+
+  /* ---------- 阴影（冷调，避免发黄；底色变浅后同步收敛） ---------- */
+  --shadow-sm: 0 2px 10px -4px rgba(8, 14, 12, .46);
+  --shadow-md: 0 18px 44px -20px rgba(8, 14, 12, .58);
+  --shadow-lg: 0 40px 90px -34px rgba(8, 14, 12, .66);
+  --shadow-glow: 0 20px 60px -28px rgba(210, 85, 54, .42);
+
+  /* ---------- 字体 ---------- */
+  --font-sans:  "Inter", "Helvetica Neue", "PingFang SC", "HarmonyOS Sans SC",
+                "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong",
+                "SimSun", Georgia, serif;
+  --font-mono:  "Space Mono", ui-monospace, "SFMono-Regular", "Cascadia Mono",
+                Consolas, monospace;
+
+  /* ---------- 字号（流式） ---------- */
+  --fs-display: clamp(2.75rem, 8.2vw, 7rem);
+  --fs-h1:      clamp(2.15rem, 5.4vw, 4.1rem);
+  --fs-h2:      clamp(1.65rem, 3.6vw, 2.7rem);
+  --fs-h3:      clamp(1.2rem, 2.1vw, 1.55rem);
+  --fs-h4:      clamp(1.02rem, 1.5vw, 1.18rem);
+  --fs-lead:    clamp(1.05rem, 1.55vw, 1.32rem);
+  --fs-body:    1rem;
+  --fs-sm:      .875rem;
+  --fs-xs:      .75rem;
+  --fs-mono:    .78rem;
+
+  /* ---------- 字距 ---------- */
+  --ls-tight:  -.025em;
+  --ls-normal: 0;
+  --ls-wide:   .06em;
+  --ls-wider:  .18em;
+
+  /* ---------- 行高 ---------- */
+  --lh-tight:  1.06;
+  --lh-snug:   1.22;
+  --lh-normal: 1.5;
+  --lh-loose:  1.85;
+
+  /* ---------- 间距 ---------- */
+  --sp-1:  .25rem;
+  --sp-2:  .5rem;
+  --sp-3:  .75rem;
+  --sp-4:  1rem;
+  --sp-5:  1.5rem;
+  --sp-6:  2rem;
+  --sp-7:  2.5rem;
+  --sp-8:  3rem;
+  --sp-9:  4rem;
+  --sp-10: 5rem;
+  --sp-11: 6.5rem;
+  --sp-12: 8rem;
+
+  /* ---------- 版心与留白 ---------- */
+  --maxw:        1320px;
+  --maxw-text:   68ch;
+  --gutter:      clamp(1.25rem, 5vw, 4.5rem);
+  --section-y:   clamp(4.5rem, 10vw, 9rem);
+  --nav-h:       72px;
+
+  /* ---------- 圆角 ---------- */
+  --r-xs: 2px;
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  /* ---------- 动效 ---------- */
+  --ease-out:   cubic-bezier(.22, 1, .36, 1);      /* 入场：快速起步、柔和收尾 */
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --ease-soft:  cubic-bezier(.4, 0, .2, 1);
+  --d-instant:  140ms;
+  --d-fast:     240ms;
+  --d-base:     420ms;
+  --d-slow:     780ms;
+  --d-reveal:   900ms;
+
+  /* ---------- 层级 ---------- */
+  --z-base:    1;
+  --z-sticky:  50;
+  --z-nav:     100;
+  --z-cursor:  200;
+  --z-modal:   300;
+
+  /* ---------- 装饰：网格底纹 ---------- */
+  --grid-line: rgba(244, 246, 240, .055);
+}
+
+/* 中文正文优先使用系统黑体，宋体仅用于标题点缀，保证阅读效率 */
+:root:lang(zh),
+html[data-lang="zh"] {
+  --font-sans: "Inter", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei",
+               system-ui, sans-serif;
+}

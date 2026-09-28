@@ -1,0 +1,422 @@
+/* ==========================================================================
+   pages.css — 各页面专属样式（首页 Hero / 作品页 / 关于页 / 详情页 / 联系页）
+   ========================================================================== */
+
+/* ==========================================================================
+   首页 Hero
+   ========================================================================== */
+
+.hero {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  padding-block: calc(var(--nav-h) + clamp(2rem, 5vw, 3.25rem)) clamp(3.5rem, 6vw, 5rem);
+  overflow: hidden;
+}
+
+/* 右侧竖向装饰线与坐标文字 */
+.hero__rail {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--gutter);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  pointer-events: none;
+}
+
+.hero__rail-line {
+  flex: 1;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--c-line-strong), transparent);
+  max-height: 180px;
+}
+
+.hero__rail-text {
+  writing-mode: vertical-rl;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wider);
+  color: var(--c-text-3);
+  text-transform: uppercase;
+}
+
+@media (max-width: 1000px) { .hero__rail { display: none; } }
+
+.hero__inner { position: relative; z-index: var(--z-base); width: 100%; }
+
+.hero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-bottom: clamp(1.5rem, 4vw, 2.75rem);
+  flex-wrap: wrap;
+}
+
+.hero__eyebrow-line {
+  width: clamp(28px, 6vw, 64px);
+  height: 1px;
+  background: var(--c-accent);
+  flex: none;
+}
+
+.hero__name {
+  font-family: var(--font-serif);
+  font-size: var(--fs-display);
+  font-weight: 600;
+  line-height: .98;
+  letter-spacing: -.02em;
+  margin-bottom: var(--sp-5);
+}
+
+/* 英文名：等宽大写，与中文宋体形成对照。
+   它只在中文模式下作为罗马字装饰出现；英文模式下 h1 本身已是 NIU LUXIANG，
+   再显示会重复，所以用语言作用域直接隐藏（而不是给元素挂 data-lang，
+   那样会被误算成一个中文文案节点）。 */
+.hero__name-en {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: clamp(.8rem, 1.5vw, 1.05rem);
+  font-weight: 400;
+  letter-spacing: .42em;
+  color: var(--c-text-2);
+  margin-top: var(--sp-5);
+  text-transform: uppercase;
+}
+
+html[data-lang='en'] .hero__name-en {
+  display: none;
+}
+
+.hero__title-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  margin-bottom: clamp(1.5rem, 3.5vw, 2.25rem);
+  font-size: clamp(1.35rem, 3.4vw, 2.35rem);
+  font-weight: 400;
+  letter-spacing: var(--ls-tight);
+}
+
+.hero__title-line .sep { color: var(--c-accent); font-weight: 300; }
+
+.hero__lead {
+  max-width: 46ch;
+  font-size: var(--fs-lead);
+  line-height: var(--lh-loose);
+  color: var(--c-text-2);
+  margin-bottom: clamp(2rem, 4.5vw, 3rem);
+}
+
+.hero__cta {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.hero__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--sp-5);
+  margin-top: clamp(2rem, 4vw, 3rem);
+  max-width: 780px;
+}
+
+/* 滚动提示。
+   注意：它必须是 .hero 的直接子元素。若放回 .hero__inner 里（那个元素有
+   position:relative），inset-block-end 就会相对内容块定位，Scroll 提示会
+   直接压在下面的统计数字上。 */
+.hero__scroll {
+  position: absolute;
+  inset-block-end: clamp(1.25rem, 3vw, 2rem);
+  inset-inline-start: var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wider);
+  text-transform: uppercase;
+  color: var(--c-text-3);
+}
+
+.hero__scroll-bar {
+  width: 46px;
+  height: 1px;
+  background: var(--c-line-strong);
+  position: relative;
+  overflow: hidden;
+}
+.hero__scroll-bar::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 40%;
+  background: var(--c-accent);
+  animation: scrollHint 2.4s var(--ease-in-out) infinite;
+}
+
+@keyframes scrollHint {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+/* ==========================================================================
+   关于我（首页）
+   ========================================================================== */
+
+.about-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: clamp(2rem, 6vw, 5rem);
+  align-items: start;
+}
+
+@media (max-width: 880px) {
+  .about-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.about-portrait {
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  background: var(--c-bg-raised);
+}
+
+.about-quote {
+  font-family: var(--font-serif);
+  font-size: clamp(1.15rem, 2.4vw, 1.75rem);
+  line-height: 1.6;
+  font-weight: 600;
+  padding-inline-start: var(--sp-5);
+  border-inline-start: 2px solid var(--c-accent);
+  margin-block: var(--sp-6);
+  color: var(--c-text);
+}
+
+.skill-row {
+  display: grid;
+  grid-template-columns: minmax(0, 150px) minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: baseline;
+  padding-block: var(--sp-4);
+  border-top: 1px solid var(--c-line);
+}
+
+.skill-row__k {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wider);
+  text-transform: uppercase;
+  color: var(--c-text-3);
+}
+
+@media (max-width: 560px) {
+  .skill-row { grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
+}
+
+/* 技能条 */
+.bar-list { display: grid; gap: var(--sp-4); }
+
+.bar-item__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
+.bar-item__top span:last-child {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--c-text-3);
+  letter-spacing: var(--ls-wide);
+}
+
+.bar-track {
+  height: 2px;
+  background: var(--c-line);
+  overflow: hidden;
+  border-radius: var(--r-pill);
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--c-accent), var(--c-jade));
+  width: 0;
+  transition: width 1.4s var(--ease-out);
+  transition-delay: 300ms;
+}
+.is-in .bar-fill, .bar-item.is-in .bar-fill { width: var(--bar-w, 0%); }
+
+/* ==========================================================================
+   作品页
+   ========================================================================== */
+
+.works-grid { display: grid; gap: clamp(1.5rem, 3vw, 2.5rem); }
+
+.works-toolbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-5);
+}
+
+.result-count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wide);
+  color: var(--c-text-3);
+}
+
+/* ==========================================================================
+   项目详情页
+   ========================================================================== */
+
+.detail-cover {
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  margin-bottom: clamp(2rem, 5vw, 3.5rem);
+  /* 收敛主图宽度：大图不再铺满整个版心，阅读节奏更轻 */
+  max-width: 880px;
+  margin-inline: auto;
+}
+.detail-cover img { width: 100%; }
+
+/* 真实作品图：与占位块保持一致的描边与圆角 */
+.figure img {
+  width: 100%;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  background: var(--c-bg-raised);
+}
+/* 作品图高矮不一，让每格各自顶部对齐，避免整行被最高的一张拉出空洞 */
+.detail-gallery .figure { align-content: start; }
+
+.detail-title {
+  font-size: var(--fs-h1);
+  line-height: 1.1;
+  margin-block: var(--sp-4) var(--sp-5);
+  max-width: 20ch;
+}
+
+.detail-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1rem, 2.5vw, 1.75rem);
+  /* 同上：整组作品图收窄并居中，单张比原来小约三成 */
+  max-width: 1000px;
+  margin-inline: auto;
+}
+
+.detail-gallery .span-2 { grid-column: 1 / -1; }
+
+@media (max-width: 640px) {
+  .detail-gallery { grid-template-columns: minmax(0, 1fr); }
+}
+
+.swatch-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--sp-3);
+}
+
+.swatch {
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.swatch__chip { height: 76px; }
+
+.swatch__meta {
+  padding: var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  letter-spacing: var(--ls-wide);
+  color: var(--c-text-2);
+  line-height: 1.6;
+  background: var(--c-bg-raised);
+}
+.swatch__meta b { display: block; color: var(--c-text); font-weight: 400; }
+
+/* ==========================================================================
+   联系页
+   ========================================================================== */
+
+.contact-hero {
+  font-size: clamp(2rem, 6.5vw, 4.6rem);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: var(--ls-tight);
+  max-width: 22ch;
+}
+
+.contact-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, .7fr);
+  gap: clamp(2rem, 6vw, 5rem);
+  align-items: start;
+}
+
+@media (max-width: 820px) {
+  .contact-split { grid-template-columns: minmax(0, 1fr); }
+}
+
+.avail-card {
+  padding: var(--sp-5);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  background: var(--c-bg-raised);
+}
+
+.avail-list { display: grid; gap: var(--sp-3); margin-top: var(--sp-4); }
+
+.avail-list li {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  font-size: var(--fs-sm);
+  color: var(--c-text-2);
+  line-height: var(--lh-normal);
+}
+
+.avail-list li::before {
+  content: "";
+  flex: none;
+  width: 6px; height: 6px;
+  margin-top: .5rem;
+  border-radius: 50%;
+  background: var(--c-jade);
+}
+
+/* ==========================================================================
+   404 / 空状态
+   ========================================================================== */
+
+.empty-state {
+  text-align: center;
+  padding-block: clamp(4rem, 12vw, 9rem);
+}
+
+.empty-state__code {
+  font-family: var(--font-mono);
+  font-size: clamp(3rem, 12vw, 8rem);
+  font-weight: 700;
+  color: var(--c-accent-dim);
+  line-height: 1;
+  letter-spacing: -.04em;
+  margin-bottom: var(--sp-5);
+}

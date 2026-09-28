@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>牛潞翔 · 视觉传达设计师 · 简历</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Serif+SC:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 0; }
+
+  :root {
+    --ink:   #14181A;
+    --ink-2: #4A5257;
+    --ink-3: #8A9298;
+    --rule:  #D8DCDF;
+    --red:   #B23A26;
+    --jade:  #4E7A69;
+    --serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif;
+    --sans:  'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+    --mono:  'Space Mono', ui-monospace, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; padding: 0; background: #fff; }
+
+  body {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 11mm 14mm 9mm;
+    font-family: var(--sans);
+    font-size: 8.5pt;
+    line-height: 1.52;
+    color: var(--ink-2);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------------- 页眉 ---------------- */
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10mm; }
+
+  .head__name {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: 23pt;
+    line-height: 1;
+    letter-spacing: .04em;
+    color: var(--ink);
+    margin: 0;
+  }
+  .head__latin {
+    font-family: var(--mono);
+    font-size: 7pt;
+    letter-spacing: .3em;
+    color: var(--ink-3);
+    margin: 2.2mm 0 0;
+    text-transform: uppercase;
+  }
+  .head__role {
+    font-family: var(--serif);
+    font-size: 10.2pt;
+    font-weight: 600;
+    color: var(--red);
+    margin: 1.8mm 0 0;
+    letter-spacing: .02em;
+  }
+  .head__role small {
+    display: block;
+    font-family: var(--sans);
+    font-size: 8pt;
+    font-weight: 400;
+    color: var(--ink-3);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-top: 1.2mm;
+  }
+
+  .head__meta { text-align: right; font-family: var(--mono); font-size: 8pt; color: var(--ink-2); line-height: 1.9; white-space: nowrap; }
+  .head__meta b { color: var(--ink); font-weight: 400; }
+
+  .rule { height: 2px; background: var(--ink); margin: 4.2mm 0 0; }
+  .rule--thin { height: 1px; background: var(--rule); margin: 0; }
+
+  /* ---------------- 区块 ---------------- */
+  .sec { display: grid; grid-template-columns: 25mm 1fr; gap: 6mm; padding: 3.8mm 0 0; }
+
+  .sec__label {
+    font-family: var(--mono);
+    font-size: 7.2pt;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--red);
+    padding-top: .5mm;
+  }
+  .sec__label span { display: block; font-size: 8.4pt; letter-spacing: .06em; color: var(--ink); margin-top: 1mm; font-family: var(--serif); font-weight: 600; }
+
+  .sec__body > *:first-child { margin-top: 0; }
+  .sec__body > *:last-child { margin-bottom: 0; }
+
+  /* ---------------- 条目 ---------------- */
+  .item { margin-bottom: 2.4mm; }
+  .item:last-child { margin-bottom: 0; }
+
+  .item__top { display: flex; align-items: baseline; justify-content: space-between; gap: 5mm; }
+  .item__title { font-family: var(--serif); font-size: 9.7pt; font-weight: 600; color: var(--ink); letter-spacing: .01em; }
+  .item__title em { font-style: normal; font-family: var(--sans); font-size: 8.2pt; font-weight: 400; color: var(--ink-3); }
+  .item__date { font-family: var(--mono); font-size: 7.3pt; color: var(--ink-3); white-space: nowrap; letter-spacing: .02em; }
+  .item__desc { margin: .8mm 0 0; }
+  .item__desc strong { color: var(--ink); font-weight: 500; }
+
+  /* ---------------- 技能表 ---------------- */
+  .kv { display: grid; grid-template-columns: 22mm 1fr; gap: 3mm 4mm; }
+  .kv dt { font-family: var(--mono); font-size: 7.6pt; color: var(--ink-3); letter-spacing: .04em; padding-top: .3mm; }
+  .kv dd { margin: 0; color: var(--ink-2); }
+  .kv dd b { color: var(--ink); font-weight: 500; }
+
+  .tags { display: flex; flex-wrap: wrap; gap: 1.6mm; }
+  .tag {
+    border: .6pt solid var(--rule);
+    border-radius: 2mm;
+    padding: .7mm 2.2mm;
+    font-size: 7.8pt;
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+  .tag--red { border-color: #E4BDB4; color: var(--red); background: #FBF2F0; }
+  .tag--jade { border-color: #C3D6CE; color: var(--jade); background: #F2F7F5; }
+
+  .quote {
+    font-family: var(--serif);
+    font-size: 10pt;
+    color: var(--ink);
+    border-left: 2px solid var(--red);
+    padding-left: 3.4mm;
+    line-height: 1.6;
+  }
+
+  .foot {
+    margin-top: 6mm;
+    padding-top: 3mm;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 7pt;
+    color: var(--ink-3);
+    letter-spacing: .06em;
+  }
+</style>
+</head>
+<body>
+
+  <header class="head">
+    <div>
+      <h1 class="head__name">牛潞翔</h1>
+      <p class="head__latin">Niu Luxiang</p>
+      <p class="head__role">视觉传达设计师<small>Visual Communication Designer</small></p>
+    </div>
+    <div class="head__meta">
+      <b>186 3651 3232</b><br>
+      n3210636933@outlook.com<br>
+      山西 · 长治<br>
+      <span style="color:var(--ink-3)">微信同手机号</span>
+    </div>
+  </header>
+  <div class="rule"></div>
+
+  <!-- ============ 教育背景 ============ -->
+  <section class="sec">
+    <div class="sec__label">Education<span>教育背景</span></div>
+    <div class="sec__body">
+      <div class="item">
+        <div class="item__top">
+          <span class="item__title">晋中学院 <em>· 视觉传达设计 · 统招本科</em></span>
+          <span class="item__date">2023.09 — 2027.06</span>
+        </div>
+        <p class="item__desc">
+          <strong>专业成绩排名前 15%</strong>。在校期间参与校级设计竞赛 2 次，获「文化创意设计大赛」三等奖。<br>
+          主修课程：品牌设计、版式设计、书籍设计、视觉传达概论、数字插画。
+        </p>
+      </div>
+    </div>
+  </section>
+  <div class="rule--thin" style="margin-top:3.8mm"></div>
+
+  <!-- ============ 专业技能 ============ -->
+  <section class="sec">
+    <div class="sec__label">Skills<span>专业技能</span></div>
+    <div class="sec__body">
+      <dl class="kv">
+        <dt>设计软件</dt>
+        <dd class="tags">
+          <span class="tag">Adobe Photoshop</span>
+          <span class="tag">Adobe Illustrator</span>
+          <span class="tag">Adobe InDesign</span>
+        </dd>
+        <dt>办公软件</dt>
+        <dd class="tags">
+          <span class="tag">Word</span>
+          <span class="tag">Excel</span>
+          <span class="tag">PowerPoint</span>
+        </dd>
+        <dt>AI 辅助</dt>
+        <dd class="tags">
+          <span class="tag tag--red">ChatGPT</span>
+          <span class="tag tag--red">Gemini</span>
+          <span class="tag tag--red">Midjourney</span>
+        </dd>
+        <dt>能力方向</dt>
+        <dd class="tags">
+          <span class="tag tag--jade">品牌 VI 与标志</span>
+          <span class="tag tag--jade">包装结构与印前</span>
+          <span class="tag tag--jade">书籍装帧与网格</span>
+          <span class="tag tag--jade">信息可视化</span>
+          <span class="tag tag--jade">插画与商业摄影</span>
+        </dd>
+      </dl>
+    </div>
+  </section>
+  <div class="rule--thin" style="margin-top:3.8mm"></div>
+
+  <!-- ============ 项目经历 ============ -->
+  <section class="sec">
+    <div class="sec__label">Projects<span>项目经历</span></div>
+    <div class="sec__body">
+
+      <div class="item">
+        <div class="item__top">
+          <span class="item__title">晋味儿白酒品牌 VI 设计 <em>· 项目负责人</em></span>
+          <span class="item__date">2025.09 — 2025.12</span>
+        </div>
+        <p class="item__desc">独立完成 <strong>52 页 VI 手册</strong>：基础系统 25 项（品牌理念、标志标准制图、标准字、标准色与辅助色、辅助图形、吉祥物三视图）与应用系统 21 项（名片、信封、档案袋、宣传册、户外广告、门头招牌、指示牌、工作服、手提袋、笔记本等）。</p>
+      </div>
+
+      <div class="item">
+        <div class="item__top">
+          <span class="item__title">娃哈哈 30 周年广告策划设计 <em>· 项目负责人</em></span>
+          <span class="item__date">2026.02 — 2026.06</span>
+        </div>
+        <p class="item__desc">完成 <strong>30 页广告策划案</strong>：市场分析、广告策略、广告表现策略与媒介排期四大板块；主视觉提出「<strong>快乐没有保质期</strong>」，并完成 IP 形象、包装与平面广告的延展设计。</p>
+      </div>
+
+      <div class="item">
+        <div class="item__top">
+          <span class="item__title">喜力啤酒包装设计 <em>· 主创设计</em></span>
+          <span class="item__date">2025</span>
+        </div>
+        <p class="item__desc">设计六瓶装手提盒、插口式邮寄盒与翻盖礼品盒三类盒型，输出完整刀版展开图，并延展绿、蓝、紫三个色系。</p>
+      </div>
+
+      <div class="item">
+        <div class="item__top">
+          <span class="item__title">《忍道》书籍装帧设计 <em>· 主创设计</em></span>
+          <span class="item__date">2025</span>
+        </div>
+        <p class="item__desc">从开本与网格入手，完成封面主视觉、封底标志系统与漫画分镜式内页的整体装帧。</p>
+      </div>
+
+      <div class="item">
+        <div class="item__top">
+          <span class="item__title">山西老陈醋文创形象设计 <em>· 主创设计</em></span>
+          <span class="item__date">2025</span>
+        </div>
+        <p class="item__desc">把醋坛、醋瓶与醋罐拟人化为卡通 IP 形象，统一描边与比例规范，延展成系列角色与包装效果图。</p>
+      </div>
+
+      <div class="item">
+        <div class="item__top">
+          <span class="item__title">左权民歌信息可视化设计 <em>· 信息设计</em></span>
+          <span class="item__date">2024</span>
+        </div>
+        <p class="item__desc">以仿古卷轴与戏曲纹样为视觉框架，梳理左权民歌的发展脉络、题材分类与代表性作品。</p>
+      </div>
+
+      <div class="item">
+        <div class="item__top">
+          <span class="item__title">插画与商业摄影 <em>· 插画 / 摄影</em></span>
+          <span class="item__date">2024</span>
+        </div>
+        <p class="item__desc">以山西古建与中秋为题创作数字插画；为饮料品牌完成棚拍产品摄影，以深红绸缎与冰块控制质感与高光。</p>
+      </div>
+
+      <div class="item">
+        <div class="item__top">
+          <span class="item__title">标志设计 <em>· 标志设计</em></span>
+          <span class="item__date">2023</span>
+        </div>
+        <p class="item__desc">完成晋味儿、书香淄博、云逸酒店与生态农业四个标志，每个均附标志释义与黑白稿。</p>
+      </div>
+
+    </div>
+  </section>
+  <div class="rule--thin" style="margin-top:3.8mm"></div>
+
+  <!-- ============ 获奖与理念 ============ -->
+  <section class="sec">
+    <div class="sec__label">Honours<span>获奖荣誉</span></div>
+    <div class="sec__body">
+      <div class="item">
+        <div class="item__top">
+          <span class="item__title">文化创意设计大赛 <em>· 三等奖</em></span>
+          <span class="item__date">在校期间</span>
+        </div>
+        <p class="item__desc">晋中学院校级设计竞赛，共参与 2 次。</p>
+      </div>
+      <p class="quote" style="margin-top:4mm">设计对我来说，是在减法中找到最有力的表达。</p>
+    </div>
+  </section>
+
+  <div class="foot">
+    <span>牛潞翔 · NIU LUXIANG · 视觉传达设计师</span>
+    <span>作品集 / PORTFOLIO</span>
+  </div>
+
+</body>
+</html>

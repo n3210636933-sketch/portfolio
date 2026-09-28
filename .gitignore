@@ -1,0 +1,15 @@
+# 本地工具产生的目录，不参与部署
+.shots/
+.sheets/
+.edge-profile/
+.edge-profile-tmp/
+.edge-rs-*/
+.editor-backup/
+.upload-originals/
+
+# 临时脚本
+tmp-*
+
+node_modules/
+.DS_Store
+Thumbs.db
