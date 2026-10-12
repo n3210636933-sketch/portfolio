@@ -130,7 +130,8 @@ html.ed-on .work-card__media img { transform: none !important; }
 
 /* ---------------------------------------------------------- 改文字面板 */
 .ed-pop {
-  position: absolute;
+  /* 用 fixed 而不是 absolute：面板永远贴着元素，不会因为页面滚动而跑出视野 */
+  position: fixed;
   z-index: 999999;
   padding: 14px;
   border: 1px solid var(--ed-line);
@@ -185,6 +186,124 @@ html.ed-on .work-card__media img { transform: none !important; }
   justify-content: flex-end;
   gap: 8px;
   margin-top: 4px;
+}
+
+/* ---------------------------------------------------------- 换图片 · 二选一 */
+.ed-pop--img {
+  padding: 12px;
+}
+.ed-opt {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+  padding: 11px 12px;
+  border: 1px solid var(--ed-line);
+  border-radius: 10px;
+  background: var(--ed-panel-2);
+  color: var(--ed-ink);
+  font-family: var(--ed-sans);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s, background-color 0.16s, transform 0.16s;
+}
+.ed-opt:hover {
+  border-color: var(--ed-accent-strong);
+  background: #382F2A;
+  transform: translateY(-1px);
+}
+.ed-opt__t {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.ed-opt__d {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ed-ink-2);
+}
+.ed-opt__d.is-bad { color: #E8A88C; }
+.ed-opt--ai .ed-opt__t { color: var(--ed-accent); }
+
+/* ---------------------------------------------------------- AI 生图面板 */
+.ed-pop--ai {
+  padding: 14px 15px 12px;
+}
+.ed-pop__grid {
+  display: flex;
+  gap: 10px;
+}
+.ed-pop__grid .ed-pop__row { flex: 1; }
+.ed-pop select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 8px;
+  border: 1px solid var(--ed-line);
+  border-radius: 8px;
+  background: #1A1614;
+  color: var(--ed-ink);
+  font-family: var(--ed-sans);
+  font-size: 12px;
+}
+.ed-pop select:focus {
+  outline: none;
+  border-color: var(--ed-accent-strong);
+}
+.ed-check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 2px 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ed-ink);
+  cursor: pointer;
+}
+.ed-check input { margin-top: 2px; accent-color: var(--ed-accent-strong); }
+.ed-check em {
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--ed-ink-2);
+}
+.ed-btn[disabled] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* ---------------------------------------------------------- 生成进度 */
+.ed-progress {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  z-index: 999999;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  border: 1px solid var(--ed-accent-strong);
+  border-radius: 999px;
+  background: var(--ed-panel);
+  color: var(--ed-ink);
+  box-shadow: var(--ed-shadow);
+  font-family: var(--ed-sans);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.ed-progress::before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 9px;
+  border-radius: 50%;
+  background: var(--ed-accent);
+  animation: ed-pulse 1s ease-in-out infinite;
+}
+@keyframes ed-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.1); }
 }
 
 /* ---------------------------------------------------------- 提示条 */

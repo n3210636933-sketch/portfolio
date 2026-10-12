@@ -9,6 +9,7 @@
 
 # 临时脚本
 tmp-*
+_ai-test*
 
 node_modules/
 .DS_Store

@@ -108,6 +108,7 @@
     document.querySelectorAll('.ed-marked').forEach(function (n) { n.classList.remove('ed-marked'); });
     hideBadge();
     closePop();
+    closeImagePop();
     // 点「完成编辑」通常就意味着「我改完了」，顺手把改动发布到线上
     publishNow();
   }
@@ -147,10 +148,80 @@
   }, true);
 
   /* ------------------------------------------------------------ 换图片 */
+  /**
+   * 点一张图之后不再直接弹「选文件」，而是先问一句：用你自己的图，还是让 AI 现生一张？
+   * 两条路最后都走同一个 POST /__editor/image，所以「落盘 + 改引用 + 备份 + 发布」
+   * 的规则完全一致，不会因为多了个 AI 入口就出现两套行为。
+   */
   function handleImage(el, kind, e) {
     e.preventDefault();
     e.stopPropagation();
+    openImagePop(el, kind);
+  }
 
+  function closeImagePop() { if (imgPop) { imgPop.remove(); imgPop = null; } closeAiPanel(); }
+
+  function closeAiPanel() {
+    if (aiPop) { aiPop.remove(); aiPop = null; }
+    closeProgress();
+  }
+
+  function closeProgress() {
+    if (progTimer) { clearInterval(progTimer); progTimer = null; }
+    if (progEl) { progEl.remove(); progEl = null; }
+  }
+
+  function openImagePop(el, kind) {
+    closePop();
+    closeImagePop();
+
+    imgPop = document.createElement('div');
+    imgPop.className = 'ed-pop ed-pop--img';
+    imgPop.setAttribute('data-editor-ui', '');
+    imgPop.innerHTML =
+      '<div class="ed-pop__head">换这张图</div>' +
+      '<button type="button" class="ed-opt" data-ed-pick>' +
+      '<span class="ed-opt__t">选一张本地图片</span>' +
+      '<span class="ed-opt__d">从电脑里挑一张，立刻替换</span>' +
+      '</button>' +
+      '<button type="button" class="ed-opt ed-opt--ai" data-ed-ai>' +
+      '<span class="ed-opt__t">✨ AI 生图</span>' +
+      '<span class="ed-opt__d" data-ed-aistate>写提示词，让 Agnes 现场生成一张</span>' +
+      '</button>' +
+      '<div class="ed-pop__foot"><button type="button" class="ed-btn ed-btn--ghost" data-ed-cancel>取消</button></div>';
+
+    document.body.appendChild(imgPop);
+    positionPop(imgPop, el);
+
+    imgPop.querySelector('[data-ed-cancel]').addEventListener('click', closeImagePop);
+    imgPop.querySelector('[data-ed-pick]').addEventListener('click', function () {
+      closeImagePop();
+      pickLocalFile(el, kind);
+    });
+    imgPop.querySelector('[data-ed-ai]').addEventListener('click', function () {
+      var btn = this;
+      setAiState(btn, '正在检查生图服务…');
+      aiReady(function (err, res) {
+        if (err) { setAiState(btn, '查不到生图状态：' + err.message, true); return; }
+        if (!res.ready) {
+          setAiState(btn, '还没配置 API key：在网站目录跑一次 node tools/set-key.mjs sk-你的key', true);
+          return;
+        }
+        imgPop.remove(); imgPop = null;
+        openAiPanel(el, kind);
+      });
+    });
+  }
+
+  function setAiState(btn, text, bad) {
+    var s = btn.querySelector('[data-ed-aistate]');
+    if (!s) return;
+    s.textContent = text;
+    s.className = 'ed-opt__d' + (bad ? ' is-bad' : '');
+  }
+
+  /* ---------------------------------------------------------- 本地文件 */
+  function pickLocalFile(el, kind) {
     var input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml';
@@ -162,34 +233,11 @@
       var file = input.files && input.files[0];
       input.remove();
       if (!file) return;
-
       var reader = new FileReader();
       reader.onload = function () {
-        var list = slotsOf(kind);
-        var ordinal = list.indexOf(el);
-        var body = {
-          file: currentFile(),
-          kind: kind,
-          ordinal: ordinal,
-          dataUrl: reader.result,
-          filename: file.name,
-        };
-        if (kind === 'img') body.expectedSrc = el.getAttribute('src') || '';
-        else body.expectedLabel = labelOf(el);
-
         badge && (badge.textContent = '正在保存…');
-        post('image', body, function (err, res) {
+        saveImageTo({ file: currentFile(), kind: kind, ordinal: slotsOf(kind).indexOf(el), dataUrl: reader.result, filename: file.name }, el, kind, function (err, res) {
           if (err) { toast('替换失败：' + err.message, 'error'); hideBadge(); return; }
-          // 立刻在当前页面上生效，不用刷新
-          var url = '/' + res.image;
-          if (kind === 'img') {
-            el.setAttribute('src', url);
-          } else {
-            el.style.backgroundImage = "url('" + url + "')";
-            el.style.backgroundSize = 'cover';
-            el.style.backgroundPosition = 'center';
-            el.classList.add('is-filled');
-          }
           hideBadge();
           toast('已替换；文件已保存到 ' + res.image);
         });
@@ -200,9 +248,262 @@
     input.click();
   }
 
+  /** 把「换图」的请求发给本地服务，成功后立刻在当前页面上生效（不用刷新） */
+  function saveImageTo(body, el, kind, cb) {
+    if (kind === 'img') {
+      body.expectedSrc = el.getAttribute('src') || '';
+      body.expectedAlt = el.getAttribute('alt') || '';
+    } else {
+      body.expectedLabel = labelOf(el);
+    }
+    post('image', body, function (err, res) {
+      if (err) { cb(err); return; }
+      applyImageLocally(el, kind, res.image);
+      cb(null, res);
+    });
+  }
+
+  function applyImageLocally(el, kind, relImage) {
+    var url = '/' + relImage;
+    if (kind === 'img') {
+      var pre = new Image();
+      pre.onload = function () {
+        if (pre.naturalWidth) {
+          el.setAttribute('width', pre.naturalWidth);
+          el.setAttribute('height', pre.naturalHeight);
+        }
+      };
+      pre.src = url;
+      el.setAttribute('src', url);
+      el.removeAttribute('srcset');
+      el.setAttribute('data-ed-made', relImage);
+    } else {
+      el.style.backgroundImage = "url('" + url + "')";
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+      el.classList.add('is-filled');
+      el.setAttribute('data-ed-made', relImage);
+    }
+    madeBy[madeKey(el, kind)] = relImage;
+  }
+
   function labelOf(plate) {
     var l = plate.querySelector('.plate__label');
     return l ? l.textContent.replace(/\s+/g, ' ').trim() : '';
+  }
+
+  /** 认元素用的小账本：只活在这次页面会话里，刷新就没了（源码才是真相） */
+  var madeBy = {};
+  function madeKey(el, kind) { return kind + ':' + slotsOf(kind).indexOf(el); }
+
+  /* --------------------------------------------------------- AI 生图 */
+  var imgPop = null, aiPop = null, progEl = null, progTimer = null, aiStatus = null;
+
+  function aiReady(cb) {
+    if (aiStatus) { cb(null, aiStatus); return; }
+    fetch('/__editor/status').then(function (r) { return r.json(); }).then(function (j) {
+      aiStatus = (j && j.ai) || { ready: false, keyFrom: null };
+      cb(null, aiStatus);
+    }).catch(function (e) { cb(e); });
+  }
+
+  function openAiPanel(el, kind) {
+    closeImagePop();
+    var box = el.getBoundingClientRect();
+    var nw = el.naturalWidth || Math.round(box.width) || 0;
+    var nh = el.naturalHeight || Math.round(box.height) || 0;
+    var stored = madeBy[madeKey(el, kind)] || '';
+    var hasPicture = !!(kind === 'img' && nw && nh) || !!stored;
+
+    aiPop = document.createElement('div');
+    aiPop.className = 'ed-pop ed-pop--ai';
+    aiPop.setAttribute('data-editor-ui', '');
+
+    var html = '<div class="ed-pop__head">✨ AI 生图 · Agnes 2.5 Flash</div>' +
+      '<label class="ed-pop__row"><span>提示词（越具体越好）</span>' +
+      '<textarea rows="4" data-ed-prompt placeholder="主体 + 场景 + 风格 + 光照 + 构图，例如：白酒瓶身特写，深色木质台面，侧逆光，极简构图，高细节"></textarea></label>';
+
+    if (hasPicture) {
+      html += '<label class="ed-check"><input type="checkbox" data-ed-img2img checked>' +
+        '<span>参考当前这张图改（图生图）<em>保留原始构图和主体，只按提示词改造</em></span></label>';
+    } else {
+      html += '<p class="ed-pop__note">这个位置现在是占位图版，还没有真实图片，所以只能纯文生图。</p>';
+    }
+
+    html += '<div class="ed-pop__grid">' +
+      '<label class="ed-pop__row"><span>宽高比</span><select data-ed-ratio></select></label>' +
+      '<label class="ed-pop__row"><span>尺寸</span><select data-ed-size></select></label>' +
+      '</div>' +
+      '<p class="ed-pop__note" data-ed-px></p>' +
+      '<div class="ed-pop__foot">' +
+      '<button type="button" class="ed-btn ed-btn--ghost" data-ed-cancel>取消</button>' +
+      '<button type="button" class="ed-btn ed-btn--primary" data-ed-go>生成</button>' +
+      '</div>';
+    aiPop.innerHTML = html;
+
+    /* 宽高比默认跟这张图在页面上的样子一致 —— 这样生成的图正好填满原位置，不会被裁掉 */
+    var ratios = [
+      ['1:1', '1:1 方形'], ['4:3', '4:3 横'], ['3:4', '3:4 竖'], ['3:2', '3:2 横'],
+      ['2:3', '2:3 竖'], ['16:9', '16:9 横幅'], ['9:16', '9:16 竖屏'], ['21:9', '21:9 超宽'],
+    ];
+    var sizes = [['1K', '1K · 最快'], ['2K', '2K · 推荐'], ['3K', '3K'], ['4K', '4K · 最慢']];
+    var rs = aiPop.querySelector('[data-ed-ratio]');
+    ratios.forEach(function (r) {
+      var o = document.createElement('option');
+      o.value = r[0]; o.textContent = r[1];
+      rs.appendChild(o);
+    });
+    var ss = aiPop.querySelector('[data-ed-size]');
+    sizes.forEach(function (s) {
+      var o = document.createElement('option');
+      o.value = s[0]; o.textContent = s[1];
+      ss.appendChild(o);
+    });
+    rs.value = bestRatio(box.width || nw, box.height || nh);
+    ss.value = '2K';
+
+    var table = {
+      '1:1': { '1K': '1024×1024', '2K': '2048×2048', '3K': '3072×3072', '4K': '4096×4096' },
+      '3:4': { '1K': '864×1152', '2K': '1728×2304', '3K': '2592×3456', '4K': '3456×4608' },
+      '4:3': { '1K': '1152×864', '2K': '2304×1728', '3K': '3456×2592', '4K': '4608×3456' },
+      '16:9': { '1K': '1312×736', '2K': '2624×1472', '3K': '3936×2208', '4K': '5248×2944' },
+      '9:16': { '1K': '736×1312', '2K': '1472×2624', '3K': '2208×3936', '4K': '2944×5248' },
+      '2:3': { '1K': '832×1248', '2K': '1664×2496', '3K': '2496×3744', '4K': '3328×4992' },
+      '3:2': { '1K': '1248×832', '2K': '2496×1664', '3K': '3744×2496', '4K': '4992×3328' },
+      '21:9': { '1K': '1568×672', '2K': '3136×1344', '3K': '4704×2016', '4K': '6272×2688' },
+    };
+    var pxNote = aiPop.querySelector('[data-ed-px]');
+    function refreshPx() {
+      var dim = (table[rs.value] || {})[ss.value] || '';
+      pxNote.textContent = '输出 ' + dim + '（官方 2.5 Flash 尺寸表）· 当前位置约 ' +
+        Math.round(box.width || 0) + '×' + Math.round(box.height || 0);
+    }
+    rs.addEventListener('change', refreshPx);
+    ss.addEventListener('change', refreshPx);
+    refreshPx();
+
+    document.body.appendChild(aiPop);
+    positionPop(aiPop, el);
+    aiPop.querySelector('[data-ed-prompt]').focus();
+
+    aiPop.querySelector('[data-ed-cancel]').addEventListener('click', function () {
+      aiPop.remove(); aiPop = null;
+    });
+    aiPop.querySelector('[data-ed-go]').addEventListener('click', function () {
+      runGenerate({
+        el: el, kind: kind,
+        promptEl: aiPop.querySelector('[data-ed-prompt]'),
+        img2imgEl: aiPop.querySelector('[data-ed-img2img]'),
+        ratio: rs.value,
+        size: ss.value,
+        width: box.width || nw,
+        height: box.height || nh,
+        goBtn: this,
+      });
+    });
+  }
+
+  /** 从一堆官方比例里挑最贴近当前元素形状的那个 */
+  function bestRatio(w, h) {
+    if (!w || !h) return '1:1';
+    var list = ['1:1', '3:4', '4:3', '16:9', '9:16', '2:3', '3:2', '21:9'];
+    var target = w / h, best = '1:1', bestErr = Infinity;
+    list.forEach(function (r) {
+      var p = r.split(':');
+      var want = Number(p[0]) / Number(p[1]);
+      var err = Math.abs(target - want) / want;
+      if (err < bestErr) { bestErr = err; best = r; }
+    });
+    return best;
+  }
+
+  /** 把页面上的图缩成长边 1280 的 JPEG data URI：够模型用，也不会把请求体撑爆 */
+  function sourceDataUrl(el, kind) {
+    return new Promise(function (resolve, reject) {
+      var url = (kind === 'img' && el.getAttribute('src')) || madeBy[madeKey(el, kind)] || '';
+      if (!url || /^data:/i.test(url)) { resolve(url || ''); return; }
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var max = 1280;
+          var w = img.naturalWidth || max, h = img.naturalHeight || max;
+          var k = Math.min(1, max / Math.max(w, h));
+          var c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(w * k));
+          c.height = Math.max(1, Math.round(h * k));
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          var out = c.toDataURL('image/jpeg', 0.86);
+          if (out.length > 7 * 1024 * 1024) { reject(new Error('参考图压缩后还是太大')); return; }
+          resolve(out);
+        } catch (e) { reject(e); }
+      };
+      img.onerror = function () { resolve(''); };
+      img.src = url;
+    });
+  }
+
+  function runGenerate(o) {
+    var prompt = String(o.promptEl.value || '').trim();
+    if (!prompt) { toast('先写一句提示词吧', 'error'); o.promptEl.focus(); return; }
+
+    var useSource = !!(o.img2imgEl && o.img2imgEl.checked);
+    o.goBtn.disabled = true;
+    o.goBtn.textContent = '生成中…';
+
+    var started = Date.now();
+    var slow = useSource ? '约 25 秒' : '约 9 秒';
+    var kick = function () {
+      progress('AI 正在生图（' + slow + '）', started);
+    };
+
+    var chain = useSource ? sourceDataUrl(o.el, o.kind).catch(function () { return ''; }) : Promise.resolve('');
+    chain.then(function (src) {
+      kick();
+      var body = {
+        file: currentFile(),
+        kind: o.kind,
+        ordinal: slotsOf(o.kind).indexOf(o.el),
+        prompt: prompt,
+        size: o.size,
+        ratio: o.ratio,
+        width: Math.round(o.width),
+        height: Math.round(o.height),
+      };
+      if (useSource && src) body.sourceDataUrl = src;
+      if (o.kind === 'img') {
+        body.expectedSrc = o.el.getAttribute('src') || '';
+        body.expectedAlt = o.el.getAttribute('alt') || '';
+        body.expectedMade = madeBy[madeKey(o.el, o.kind)] || '';
+      } else {
+        body.expectedLabel = labelOf(o.el);
+      }
+
+      post('generate', body, function (err, res) {
+        closeProgress();
+        o.goBtn.disabled = false;
+        o.goBtn.textContent = '生成';
+        if (err) {
+          toast('生成失败：' + err.message, 'error');
+          return;
+        }
+        applyImageLocally(o.el, o.kind, res.image);
+        closeAiPanel();
+        toast('已生成 ' + res.width + '×' + res.height + '（' + (res.ms / 1000).toFixed(0) + '秒）→ ' + res.image);
+      });
+    });
+  }
+
+  function progress(text, started) {
+    closeProgress();
+    progEl = document.createElement('div');
+    progEl.className = 'ed-progress';
+    progEl.setAttribute('data-editor-ui', '');
+    progEl.textContent = text;
+    document.body.appendChild(progEl);
+    progTimer = setInterval(function () {
+      if (!progEl) return;
+      progEl.textContent = text + ' · 已等 ' + Math.round((Date.now() - started) / 1000) + ' 秒';
+    }, 1000);
   }
 
   /* ------------------------------------------------------------ 改文字 */
@@ -334,15 +635,24 @@
     }
   }
 
+  /**
+   * 面板一律用 fixed 定位贴在元素旁边，而不是绝对定位到文档流里。
+   * 用 fixed 的好处：无论页面滚到哪、面板多高，它都不会跑到屏幕外面去。
+   */
   function positionPop(node, anchor) {
     var r = anchor.getBoundingClientRect();
-    var w = 340;
-    node.style.width = w + 'px';
-    var left = Math.min(Math.max(12, r.left), window.innerWidth - w - 12);
+    var w = node.classList.contains('ed-pop--ai') ? 400
+      : node.classList.contains('ed-pop--img') ? 300 : 340;
+    var h = node.offsetHeight || 240;
+    var left = Math.min(Math.max(12, r.left), Math.max(12, window.innerWidth - w - 12));
     var top = r.bottom + 10;
-    if (top + 240 > window.innerHeight) top = Math.max(12, r.top - 250);
+    if (top + h > window.innerHeight - 12) {
+      top = Math.max(12, r.top - h - 10);
+      if (top < 12) top = Math.max(12, Math.min(r.bottom + 10, window.innerHeight - h - 12));
+    }
+    node.style.width = Math.min(w, window.innerWidth - 24) + 'px';
     node.style.left = Math.round(left) + 'px';
-    node.style.top = Math.round(top + window.scrollY) + 'px';
+    node.style.top = Math.round(top) + 'px';
   }
 
   /* ------------------------------------------------------- 发布到线上 */
@@ -405,7 +715,7 @@
   }
 
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { closePop(); }
+    if (e.key === 'Escape') { closePop(); closeImagePop(); if (aiPop) { aiPop.remove(); aiPop = null; } }
   });
 
   if (document.readyState === 'loading') {

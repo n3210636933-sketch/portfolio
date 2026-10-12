@@ -26,10 +26,14 @@ import {
   readFileSync, writeFileSync, existsSync, mkdirSync,
   readdirSync, copyFileSync, rmSync, statSync, renameSync,
 } from 'node:fs';
-import { basename, dirname, resolve, join, relative } from 'node:path';
+import { basename, dirname, resolve, join, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { publish } from './deploy.mjs';
+import {
+  generate as agnesGenerate, resolveKey as agnesResolveKey, hasKey as agnesHasKey,
+  pickRatio, outputPixels, pixelSize, saveImageBuffer, stamp,
+} from './agnes-image.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const argPort = process.argv.find((a) => a.startsWith('--port='))?.split('=')[1];
@@ -38,7 +42,11 @@ const HOST = '127.0.0.1';
 
 const BACKUP_DIR = join(root, '.editor-backup');
 const UPLOAD_DIR = join(root, 'assets', 'img', 'uploads');
+// AI 生成的图单独放一个目录：uploads/ 是「你自己传上去的图」，
+// 混在一起以后想整体清一遍就分不清哪些是生成的、哪些是你的原图了。
+const AI_DIR = join(root, 'assets', 'img', 'ai');
 const MAX_BODY = 40 * 1024 * 1024;
+const MAX_SOURCE_BYTES = 8 * 1024 * 1024;      // 图生图的参考图上限（data URI 很大也没关系，够用就行）
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -311,24 +319,56 @@ function saveText(body) {
 }
 
 /* ------------------------------------------------------------ 保存图片 */
-function saveImage(body) {
-  const absFile = safePath(body.file);
-  const m = /^data:image\/([a-zA-Z0-9.+-]+);base64,([\s\S]+)$/.exec(String(body.dataUrl || ''));
-  if (!m) throw new Error('图片格式无法识别（需要 PNG / JPG / WebP / GIF / SVG）');
+/**
+ * 「换图」这件事被拆成两半，是因为除了「你自己选的文件」，
+ * 现在还有第二个来源：AI 生成。两条路都走同样的落盘 + 改引用逻辑。
+ */
 
-  const extMap = { jpeg: 'jpg', 'svg+xml': 'svg', 'x-icon': 'ico' };
-  const ext = extMap[m[1].toLowerCase()] || m[1].toLowerCase();
-  const buf = Buffer.from(m[2], 'base64');
-  if (!buf.length) throw new Error('图片内容为空');
-
+/** 把字节写进 uploads/，返回绝对路径。重不覆盖，重名自动 -2 */
+function storeImage(buf, ext, filenameHint) {
   mkdirSync(UPLOAD_DIR, { recursive: true });
-  const base = (basename(String(body.filename || 'image')).replace(/\.[^.]+$/, '')
+  const base = (basename(String(filenameHint || 'image')).replace(/\.[^.]+$/, '')
     .replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)) || 'image';
   let name = `${base}.${ext}`;
   for (let n = 2; existsSync(join(UPLOAD_DIR, name)); n++) name = `${base}-${n}.${ext}`;
   const absImg = join(UPLOAD_DIR, name);
   writeFileSync(absImg, buf);
+  return absImg;
+}
 
+function pickImageNode(src, body) {
+  const imgs = listImgs(src);
+  const idx = Number(body.ordinal);
+  const at = Number.isInteger(idx) && idx >= 0 && idx < imgs.length ? { el: imgs[idx], i: idx } : null;
+  const wanted = norm(body.expectedSrc);
+  const made = norm(body.expectedMade);
+
+  // ① 最准：这一次生的图（AI 生图会记下文件名），源码里找得到就直接用它
+  if (made) {
+    const hits = imgs.map((im, i) => ({ el: im, i })).filter(({ el }) => norm(el.src) === made);
+    if (hits.length === 1) return hits[0];
+    if (hits.length > 1) return hits.find((h) => h.i === idx) || hits[0];
+  }
+  // ② 打开面板时记下的 src。只有唯一命中才敢用，避免把好几张相同的占位图改错
+  if (wanted) {
+    const hits = imgs.map((im, i) => ({ el: im, i })).filter(({ el }) => norm(el.src) === wanted);
+    if (hits.length === 1) return hits[0];
+    if (hits.length > 1) return hits.find((h) => h.i === idx) || hits[0];
+  }
+  // ③ 占位图版，src 本来就是空的：用 alt 认人，认不出来才退回序号
+  if (!wanted) {
+    const alt = norm(body.expectedAlt);
+    if (alt) {
+      const hits = imgs.map((im, i) => ({ el: im, i })).filter(({ el }) => norm(attrOf(el.html, 'alt')) === alt);
+      if (hits.length === 1) return hits[0];
+      if (hits.length > 1) return hits.find((h) => h.i === idx) || hits[0];
+    }
+  }
+  return at;
+}
+
+/** 把页面里那个 <img> / .plate 指向新图。写回磁盘前先备份，可撤销 */
+function applyImageToPage(absFile, absImg, body) {
   const relFromPage = relative(dirname(absFile), absImg).split(/[\\/]/).join('/');
   const src = readFileSync(absFile, 'utf8');
   backup(absFile);
@@ -356,8 +396,7 @@ function saveImage(body) {
 
     writeFileSync(absFile, src.slice(0, p.start) + open + src.slice(p.openEnd), 'utf8');
   } else {
-    const imgs = listImgs(src);
-    const hit = pick(imgs, { expected: body.expectedSrc, get: (i) => i.src, ordinal: body.ordinal });
+    const hit = pickImageNode(src, body);
     if (!hit) throw new Error('找不到要替换的图片。页面结构可能变了，请刷新页面重试。');
     const img = hit.el;
     const newTag = /\bsrc\s*=\s*"[^"]*"/i.test(img.html)
@@ -365,8 +404,104 @@ function saveImage(body) {
       : img.html.replace(/<img\b/i, `<img src="${relFromPage}"`);
     writeFileSync(absFile, src.slice(0, img.start) + newTag + src.slice(img.end), 'utf8');
   }
+  return relFromPage;
+}
 
-  return { file: relOf(absFile), image: relOf(absImg), bytes: buf.length };
+function saveImage(body) {
+  const absFile = safePath(body.file);
+  const m = /^data:image\/([a-zA-Z0-9.+-]+);base64,([\s\S]+)$/.exec(String(body.dataUrl || ''));
+  if (!m) throw new Error('图片格式无法识别（需要 PNG / JPG / WebP / GIF / SVG）');
+
+  const extMap = { jpeg: 'jpg', 'svg+xml': 'svg', 'x-icon': 'ico' };
+  const ext = extMap[m[1].toLowerCase()] || m[1].toLowerCase();
+  const buf = Buffer.from(m[2], 'base64');
+  if (!buf.length) throw new Error('图片内容为空');
+
+  const absImg = storeImage(buf, ext, body.filename);
+  const relFromPage = applyImageToPage(absFile, absImg, body);
+  return { file: relOf(absFile), image: relOf(absImg) };
+}
+
+/* ------------------------------------------------------------ AI 生图 */
+/**
+ * 把「点一下这张图」换成 AI 现场生成一张。
+ *
+ * 数据流刻意走服务端：浏览器永远拿不到 API key（key 存在网站文件夹外面，
+ * 而这个目录会被整份发布到公开的 GitHub Pages）。
+ *
+ * 图生图（--source）的来源有两种，都由浏览器端备好再传过来：
+ *   · 页面上本来就有的图 → 浏览器里等比缩到长边 1280 的 JPEG，够模型用，也不会撑爆请求体
+ *   · 占位图版（.plate，还没有真实图片）→ 从给定的链接拉一张参考图
+ * 两种情况都允许不传 source，那就退化成纯文生图。
+ */
+function readSourceImage(body) {
+  const { sourceDataUrl, sourcePath, sourceUrl } = body || {};
+  if (sourceDataUrl) {
+    const m = /^data:image\/([a-zA-Z0-9.+-]+);base64,([\s\S]+)$/.exec(String(sourceDataUrl));
+    if (!m) throw new Error('参考图格式无法识别');
+    const buf = Buffer.from(m[2], 'base64');
+    if (!buf.length) throw new Error('参考图是空的');
+    if (buf.length > MAX_SOURCE_BYTES) throw new Error('参考图太大了，换一张小一点的');
+    return { buf, ext: m[1] === 'jpeg' ? 'jpg' : m[1] };
+  }
+  if (sourcePath) {
+    const p = isAbsolute(String(sourcePath)) ? String(sourcePath) : safePath(String(sourcePath));
+    if (!existsSync(p)) throw new Error('参考图不存在：' + sourcePath);
+    return { buf: readFileSync(p), ext: basename(p).split('.').pop().toLowerCase() };
+  }
+  if (sourceUrl && /^https?:/i.test(String(sourceUrl))) return { url: String(sourceUrl) };
+  return null;
+}
+
+async function generateImageForPage(body) {
+  const absFile = safePath(body.file);
+  const prompt = String(body.prompt || '').trim();
+  if (!prompt) throw new Error('先写一句提示词吧');
+  if (!agnesHasKey()) {
+    throw new Error('还没有配置 Agnes 的 API key。请在网站目录下跑一次：node tools/set-key.mjs sk-你的key（然后重启编辑器）');
+  }
+
+  const size = String(body.size || '2K').toUpperCase();
+  // 宽高比只认「这张图在页面上占的那块地方」：换成别的比例会把整块版式顶歪。
+  // 前端下拉框只是显示这个结果，不参与决策（真要出特定比例的图请用命令行 gen-image.mjs）。
+  const ratio = pickRatio({ width: body.width, height: body.height });
+  const px = outputPixels(size, ratio);
+
+  const src = readSourceImage(body);
+  const onProgress = (m) => console.log('    ' + m);
+  console.log(`\n  ✨ AI 生图（${src ? '图生图' : '文生图'} ${size} ${ratio} → ${px.width}×${px.height}）`);
+  console.log(`     提示词：${prompt.slice(0, 80)}${prompt.length > 80 ? '…' : ''}`);
+
+  const { buf, ext, meta } = await agnesGenerate({
+    prompt,
+    size,
+    ratio,
+    image: src && src.buf ? src.buf : null,
+    imageExt: src && src.ext ? src.ext : '',
+    onProgress,
+  });
+
+  const pageBase = basename(absFile).replace(/\.[^.]+$/, '');
+  const nameHint = `${pageBase}-${src ? 'aiedit' : 'ai'}-${stamp()}`;
+  const absImg = saveImageBuffer(AI_DIR, buf, { ext, name: nameHint });
+  const relFromPage = applyImageToPage(absFile, absImg, body);
+
+  const dim = meta.actual || pixelSize(buf) || px;
+  console.log(`  ✓ 已生成并写入页面：${relOf(absImg)}（${Math.round(buf.length / 1024)}KB，${(meta.ms / 1000).toFixed(1)}s）`);
+
+  return {
+    file: relOf(absFile),
+    image: relOf(absImg),
+    generated: true,
+    mode: meta.mode,
+    size: meta.request.size,
+    ratio: meta.request.ratio,
+    width: dim.width,
+    height: dim.height,
+    bytes: buf.length,
+    ms: meta.ms,
+    taskId: meta.taskId,
+  };
 }
 
 /* ------------------------------------------------------------ 撤销 */
@@ -439,7 +574,10 @@ const server = createServer(async (req, res) => {
 
     if (path.startsWith('/__editor/')) {
       if (path === '/__editor/status') {
-        sendJson(res, 200, { ok: true, port: PORT, dirty, publishing, lastPublish: lastResult });
+        sendJson(res, 200, {
+          ok: true, port: PORT, dirty, publishing, lastPublish: lastResult,
+          ai: { ready: agnesHasKey(), keyFrom: agnesResolveKey().from },
+        });
         return;
       }
       if (req.method !== 'POST') { sendJson(res, 405, { ok: false, error: '只接受 POST' }); return; }
@@ -456,12 +594,14 @@ const server = createServer(async (req, res) => {
 
       const result = path === '/__editor/text' ? saveText(body)
         : path === '/__editor/image' ? saveImage(body)
-          : path === '/__editor/undo' ? undo(body)
-            : null;
+          : path === '/__editor/generate' ? await generateImageForPage(body)
+            : path === '/__editor/undo' ? undo(body)
+              : null;
       if (!result) { sendJson(res, 404, { ok: false, error: '未知接口' }); return; }
 
       // 改动已经写进本地文件了，接下来安排一次自动发布
-      schedulePublish(path === '/__editor/undo' ? '撤销后' : '编辑后');
+      schedulePublish(path === '/__editor/undo' ? '撤销后'
+        : path === '/__editor/generate' ? 'AI 生图后' : '编辑后');
       sendJson(res, 200, { ok: true, ...result, willPublishIn: AUTO_PUBLISH_DELAY });
       return;
     }
@@ -501,9 +641,16 @@ server.listen(PORT, HOST, () => {
   console.log(`   在浏览器里打开：  ${url}`);
   console.log('');
   console.log('   · 点右下角「开始编辑」进入编辑模式');
-  console.log('   · 点图片 → 选一张新图 → 立刻替换');
+  console.log('   · 点图片 → 选一张新图，或者让 AI 现场生成一张');
   console.log('   · 点文字 → 直接改 → 点保存');
   console.log('   · 每次改动都会自动备份到 .editor-backup\\');
+  console.log('');
+  {
+    const k = agnesResolveKey();
+    console.log(k.key
+      ? `   ✨ AI 生图：已就绪（key 来自 ${k.from}）`
+      : '   ✨ AI 生图：还没配置 key —— 跑一次：node tools/set-key.mjs sk-你的key');
+  }
   console.log('');
   console.log('   ★ 改完不用管，停手 ' + Math.round(AUTO_PUBLISH_DELAY / 1000) + ' 秒后会自动发布到线上');
   console.log('     也可以点「发布上线」立刻发布，或点「完成编辑」触发一次发布');
